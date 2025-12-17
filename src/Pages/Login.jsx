@@ -161,11 +161,12 @@ export default function Login() {
     []
   );
 
-  // redirect simple (plus de rôle admin)
+
   useEffect(() => {
     if (user) navigate("/teacher", { replace: true });
   }, [user, navigate]);
 
+  // google
   const handleGoogle = async () => {
     setError("");
     try {
@@ -176,15 +177,20 @@ export default function Login() {
     }
   };
 
-  const handleGithub = async () => {
+//github 
+const handleGithub = async () => {
     setError("");
     try {
       await loginGithub();
     } catch (err) {
       console.error(err);
-      setError("Erreur de connexion GitHub.");
+      setError("Erreur de connexion Github.");
     }
   };
+
+
+
+
 
   const handleEmailLogin = async () => {
     setError("");
@@ -198,7 +204,7 @@ export default function Login() {
 
   return (
     <div style={styles.wrapper}>
-      <header style={styles.header}>PlanValidator</header>
+      <header style={styles.header}>AI Grammar</header>
 
       <div style={styles.centerZone}>
         <div style={styles.card}>

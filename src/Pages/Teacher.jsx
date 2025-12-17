@@ -3,11 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { analyzeResponse } from "../openai";
 
-// Firebase (profile)
 import { db, storage } from "../firebase";
 import { updateProfile } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  deleteDoc,
+} from "firebase/firestore";
 
 const THEME = {
   bg1: "#071A2B",
@@ -62,6 +73,16 @@ function toPrettyText(raw) {
   }
 }
 
+function formatDate(ts) {
+  try {
+    const d = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
+    if (!d || Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleString();
+  } catch {
+    return "-";
+  }
+}
+
 export default function Teacher() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -72,6 +93,11 @@ export default function Teacher() {
   const [text, setText] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // HISTORY (Firestore)
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyMsg, setHistoryMsg] = useState("");
 
   // PROFILE
   const [displayName, setDisplayName] = useState("");
@@ -122,7 +148,12 @@ export default function Teacher() {
         alignItems: "start",
       },
 
-      // PROFILE layout (plus espacé)
+      // HISTORY layout
+      historyCard: {
+        gridColumn: "1 / -1",
+      },
+
+      // PROFILE layout
       profileGrid: {
         display: "grid",
         gridTemplateColumns: "320px 1fr",
@@ -138,7 +169,12 @@ export default function Teacher() {
         boxShadow: "0 22px 55px rgba(0,0,0,0.35)",
       },
       title: { margin: "0 0 10px 0", fontSize: 18, fontWeight: 900 },
-      sub: { margin: "0 0 14px 0", color: THEME.muted, fontSize: 13, lineHeight: 1.4 },
+      sub: {
+        margin: "0 0 14px 0",
+        color: THEME.muted,
+        fontSize: 13,
+        lineHeight: 1.4,
+      },
 
       textarea: {
         width: "100%",
@@ -186,6 +222,64 @@ export default function Teacher() {
         whiteSpace: "pre-wrap",
       },
       footer: { marginTop: 14, color: THEME.muted, fontSize: 12 },
+
+      // HISTORY UI
+      historyTopRow: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
+        marginBottom: 10,
+      },
+      smallBtn: {
+        borderRadius: 999,
+        padding: "8px 12px",
+        background: "rgba(255,255,255,0.06)",
+        border: `1px solid ${THEME.border}`,
+        color: THEME.text,
+        cursor: "pointer",
+        fontWeight: 800,
+        fontSize: 13,
+      },
+      historyList: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      },
+      historyItem: {
+        borderRadius: 14,
+        border: `1px solid ${THEME.border}`,
+        background: "rgba(255,255,255,0.04)",
+        padding: 12,
+      },
+      historyMeta: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
+        marginBottom: 8,
+        color: THEME.muted,
+        fontSize: 12,
+      },
+      historyText: {
+        whiteSpace: "pre-wrap",
+        fontSize: 13,
+        lineHeight: 1.5,
+        marginTop: 6,
+      },
+      dangerBtn: {
+        borderRadius: 999,
+        padding: "8px 12px",
+        background: "rgba(255, 107, 107, 0.12)",
+        border: `1px solid ${THEME.danger}`,
+        color: THEME.text,
+        cursor: "pointer",
+        fontWeight: 900,
+        fontSize: 13,
+      },
+      msg: { marginTop: 10, fontSize: 13, color: THEME.muted, whiteSpace: "pre-wrap" },
 
       // PROFILE UI
       profileTitle: { margin: "0 0 14px 0", fontSize: 26, fontWeight: 900 },
@@ -239,12 +333,6 @@ export default function Teacher() {
         background: `linear-gradient(to right, ${THEME.accent1}, ${THEME.accent2})`,
         color: THEME.text,
       },
-      msg: { marginTop: 10, fontSize: 13, color: THEME.muted, whiteSpace: "pre-wrap" },
-
-      // responsive
-      responsive: {
-        "@media (max-width: 900px)": {},
-      },
     }),
     []
   );
@@ -265,12 +353,65 @@ export default function Teacher() {
     else setProvider("Email / Mot de passe");
   }, [user]);
 
+  const loadHistory = async () => {
+    if (!user) return;
+    setHistoryMsg("");
+    setHistoryLoading(true);
+    try {
+      const q = query(
+        collection(db, "analyses"),
+        where("uid", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(5)
+      );
+
+      const snap = await getDocs(q);
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setHistory(items);
+      if (items.length === 0) setHistoryMsg("Aucune analyse sauvegardée pour l’instant.");
+    } catch (e) {
+      console.error(e);
+      setHistoryMsg(`Erreur Firestore: ${e?.message || "Impossible de charger l'historique."}`);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const deleteHistoryItem = async (id) => {
+    if (!id) return;
+    setHistoryMsg("");
+    try {
+      await deleteDoc(doc(db, "analyses", id));
+      setHistory((prev) => prev.filter((x) => x.id !== id));
+    } catch (e) {
+      console.error(e);
+      setHistoryMsg(`❌ Impossible de supprimer: ${e?.message || "Erreur"}`);
+    }
+  };
+
   const handleAnalyze = async () => {
     setLoading(true);
     setResult("");
     try {
       const raw = await analyzeResponse("Correction orthographe/grammaire", text, RULE_TEXT);
-      setResult(toPrettyText(raw) || "Aucun résultat.");
+      const pretty = toPrettyText(raw) || "Aucun résultat.";
+      setResult(pretty);
+
+      // ✅ CREATE
+      await addDoc(collection(db, "analyses"), {
+        uid: user.uid,
+        inputText: text,
+        aiResult: pretty,
+        createdAt: serverTimestamp(),
+      });
+
+      // ✅ refresh
+      await loadHistory();
     } catch (err) {
       console.error(err);
       setResult(`Erreur IA:\n${err?.message || String(err)}`);
@@ -286,7 +427,7 @@ export default function Teacher() {
       setFile(null);
       return;
     }
-    const max = 2 * 1024 * 1024; // 2MB
+    const max = 2 * 1024 * 1024;
     if (f.size > max) {
       setFile(null);
       setProfileMsg("⚠️ Fichier trop gros (max 2MB).");
@@ -386,8 +527,7 @@ export default function Teacher() {
           <div style={styles.card}>
             <h3 style={styles.title}>1 Colle ton texte</h3>
             <p style={styles.sub}>
-              L’IA va détecter les fautes et proposer des améliorations (appel: Frontend → Cloud
-              Function → OpenAI).
+              L’IA va détecter les fautes et proposer des améliorations).
             </p>
 
             <textarea
@@ -424,6 +564,62 @@ export default function Teacher() {
               ) : (
                 "Aucun résultat pour l’instant. Clique sur “Analyser”."
               )}
+            </div>
+          </div>
+
+          {/* ✅ HISTORIQUE */}
+          <div style={{ ...styles.card, ...styles.historyCard }}>
+            <div style={styles.historyTopRow}>
+              <div>
+                <div style={{ ...styles.title, margin: 0 }}>
+
+                  Historique (Firestore)
+                </div>
+                <div style={{ color: THEME.muted, fontSize: 13, marginTop: 6 }}>
+                  Les 5 dernières analyses de ton compte.
+                </div>
+              </div>
+
+              <button style={styles.smallBtn} onClick={loadHistory} disabled={historyLoading}>
+                {historyLoading ? "Chargement..." : "Rafraîchir"}
+              </button>
+            </div>
+
+            {historyMsg && <div style={styles.msg}>{historyMsg}</div>}
+
+            <div style={styles.historyList}>
+              {history.map((h) => (
+                <div key={h.id} style={styles.historyItem}>
+                  <div style={styles.historyMeta}>
+                    <div>
+                      <div>
+                        <strong>Date:</strong> {formatDate(h.createdAt)}
+                      </div>
+                      <div>
+                        <strong>ID:</strong> {h.id}
+                      </div>
+                    </div>
+
+                    <button
+                      style={styles.dangerBtn}
+                      onClick={() => deleteHistoryItem(h.id)}
+                      title="Supprimer"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+
+                  <div style={{ color: THEME.muted, fontSize: 12, marginBottom: 6 }}>
+                    <strong>Texte original:</strong>
+                  </div>
+                  <div style={styles.historyText}>{h.inputText || "-"}</div>
+
+                  <div style={{ color: THEME.muted, fontSize: 12, marginTop: 10, marginBottom: 6 }}>
+                    <strong>Résultat IA:</strong>
+                  </div>
+                  <div style={styles.historyText}>{h.aiResult || "-"}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

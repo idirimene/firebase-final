@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
+  GithubAuthProvider,              // ✅ AJOUT
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -25,13 +26,16 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
-
-
 export const functions = getFunctions(app, "us-central1");
 
-const provider = new GoogleAuthProvider();
 
-export const loginWithGoogle = () => signInWithPopup(auth, provider);
+const googleProvider = new GoogleAuthProvider();
+const githubProvider = new GithubAuthProvider(); 
+
+export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
+
+
+export const loginWithGithub = () => signInWithPopup(auth, githubProvider);
 
 export const loginWithEmailPassword = (email, password) =>
   signInWithEmailAndPassword(auth, email, password);

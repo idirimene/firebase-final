@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerWithEmailPassword, db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 
 const THEME = {
@@ -18,7 +18,7 @@ const THEME = {
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loginGoogle, loginGithub } = useAuth(); // ✅ AJOUT
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -108,6 +108,28 @@ export default function Signup() {
         cursor: "pointer",
         marginTop: 8,
       },
+      socialBtn: {
+        width: "100%",
+        borderRadius: 999,
+        border: `1px solid ${THEME.border}`,
+        marginTop: 12,
+        padding: "12px 16px",
+        fontSize: 14,
+        fontWeight: 900,
+        cursor: "pointer",
+        backgroundColor: "rgba(255,255,255,0.06)",
+        color: THEME.text,
+        boxSizing: "border-box",
+      },
+      divider: {
+        display: "flex",
+        alignItems: "center",
+        margin: "18px 0 10px 0",
+        color: THEME.muted,
+        fontSize: 12,
+        width: "100%",
+      },
+      line: { flex: 1, height: 1, backgroundColor: THEME.border },
       linkBtn: {
         width: "100%",
         borderRadius: 999,
@@ -129,6 +151,23 @@ export default function Signup() {
     if (user) navigate("/teacher", { replace: true });
   }, [user, navigate]);
 
+  const ensureUserDoc = async (u) => {
+    if (!u) return;
+    await setDoc(
+      doc(db, "users", u.uid),
+      {
+        uid: u.uid,
+        email: u.email || "",
+        displayName: u.displayName || "",
+        photoURL: u.photoURL || "",
+        providerId: u.providerData?.[0]?.providerId || "password",
+        role: "étudiant",
+        createdAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  };
+
   const handleSignup = async () => {
     setError("");
 
@@ -147,11 +186,7 @@ export default function Signup() {
       const userCredential = await registerWithEmailPassword(email, password);
       const newUser = userCredential.user;
 
-      await setDoc(doc(db, "users", newUser.uid), {
-        email: newUser.email,
-        role: "teacher",
-        createdAt: new Date(),
-      });
+      await ensureUserDoc(newUser);
 
       navigate("/teacher");
     } catch (err) {
@@ -163,6 +198,36 @@ export default function Signup() {
       } else {
         setError("Une erreur est survenue : " + err.message);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const cred = await loginGoogle(); // popup
+      await ensureUserDoc(cred?.user);
+      navigate("/teacher");
+    } catch (err) {
+      console.error(err);
+      setError("Erreur d'inscription Google.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGithubSignup = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const cred = await loginGithub(); // popup
+      await ensureUserDoc(cred?.user);
+      navigate("/teacher");
+    } catch (err) {
+      console.error(err);
+      setError("Erreur d'inscription GitHub.");
     } finally {
       setLoading(false);
     }
@@ -211,6 +276,21 @@ export default function Signup() {
             disabled={loading}
           >
             {loading ? "Création..." : "S'inscrire"}
+          </button>
+
+          {/* ✅ Google + GitHub */}
+          <div style={styles.divider}>
+            <div style={styles.line} />
+            <span style={{ padding: "0 10px" }}>ou</span>
+            <div style={styles.line} />
+          </div>
+
+          <button style={styles.socialBtn} onClick={handleGoogleSignup} disabled={loading}>
+            Continuer avec Google
+          </button>
+
+          <button style={styles.socialBtn} onClick={handleGithubSignup} disabled={loading}>
+            Continuer avec GitHub
           </button>
 
           <button style={styles.linkBtn} onClick={() => navigate("/login")}>
