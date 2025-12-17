@@ -1,23 +1,18 @@
-
 require("dotenv").config();
 
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 
-
 setGlobalOptions({
   region: "us-central1",
   maxInstances: 10,
 });
 
-
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-
-
 exports.validateAnswerAI = onRequest({ cors: true }, async (req, res) => {
-  // On ne veut que du POST
+  // POST only
   if (req.method !== "POST") {
     res.status(405).json({ error: "Méthode non autorisée" });
     return;
@@ -25,9 +20,10 @@ exports.validateAnswerAI = onRequest({ cors: true }, async (req, res) => {
 
   const { question, answer, rule } = req.body || {};
 
-  if (!question || !answer || !rule) {
+  // rule obligatoire (ton frontend l’envoie toujours)
+  if (!answer || !rule) {
     res.status(400).json({
-      error: "Les champs 'question', 'answer' et 'rule' sont obligatoires.",
+      error: "Les champs 'answer' et 'rule' sont obligatoires.",
     });
     return;
   }
@@ -38,21 +34,39 @@ exports.validateAnswerAI = onRequest({ cors: true }, async (req, res) => {
     return;
   }
 
+  // ✅ PROMPT: on respecte rule, et on force un JSON stable
   const prompt = `
-    Agis comme un expert pédagogique. Valide la réponse d'un enseignant pour un plan de cours.
+Tu es un correcteur professionnel de français (orthographe + grammaire + ponctuation + style).
+Tu dois suivre STRICTEMENT la règle fournie par l'utilisateur (RULE).
 
-    Question : "${question}"
-    Réponse de l'enseignant : "${answer}"
-    Règle à respecter : "${rule}"
+RULE:
+${rule}
 
-    Retourne UNIQUEMENT un objet JSON (sans texte avant ni après) avec ce format EXACT :
-    {
-      "status": "Conforme" | "À améliorer" | "Non conforme",
-      "points_positifs": ["point positif 1", "point positif 2"],
-      "points_a_ameliorer": ["point à améliorer 1", "point à améliorer 2"],
-      "suggestion": "Une suggestion de réécriture améliorée si nécessaire"
-    }
-  `;
+CONTEXTE (optionnel):
+${question ? `Tâche: ${question}` : ""}
+
+TEXTE À ANALYSER:
+${answer}
+
+IMPORTANT:
+- Retourne UNIQUEMENT un objet JSON (sans texte avant ni après).
+- Le JSON doit respecter EXACTEMENT ce format:
+{
+  "status": "Conforme" | "À améliorer" | "Non conforme",
+  "points_positifs": ["..."],
+  "points_a_ameliorer": ["..."],
+  "suggestion": "..."
+}
+
+RÈGLES POUR LES CHAMPS:
+- "status":
+  - "Conforme" si aucune faute majeure.
+  - "À améliorer" si quelques fautes/corrections utiles.
+  - "Non conforme" si beaucoup de fautes ou texte très difficile à comprendre.
+- "points_a_ameliorer": liste courte (max 8) qui indique OÙ est la faute avec un extrait + la correction.
+- "points_positifs": 0 à 4 éléments max (ex: clarté, vocabulaire, structure).
+- "suggestion": contient le rapport complet formaté (Verdict + fautes + texte corrigé complet + astuces), propre et lisible.
+`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -63,24 +77,29 @@ exports.validateAnswerAI = onRequest({ cors: true }, async (req, res) => {
       },
       body: JSON.stringify({
         model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Tu es un assistant qui répond uniquement en JSON valide. Aucun texte hors JSON.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.2,
       }),
     });
 
     if (!response.ok) {
       const text = await response.text();
       logger.error("Erreur HTTP OpenAI:", response.status, text);
-      res
-        .status(500)
-        .json({ error: `Erreur OpenAI (${response.status})`, details: text });
+      res.status(500).json({ error: `Erreur OpenAI (${response.status})`, details: text });
       return;
     }
 
     const data = await response.json();
     let content = data.choices?.[0]?.message?.content || "";
 
-
+    // nettoie si jamais l'IA met des ```json
     content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
 
     let parsed;
@@ -95,15 +114,15 @@ exports.validateAnswerAI = onRequest({ cors: true }, async (req, res) => {
       return;
     }
 
- 
+    // ✅ fallback propre (plus de “plan de cours”)
     const result = {
       status: parsed.status || "À améliorer",
-      points_positifs: parsed.points_positifs || parsed.positives || [],
-      points_a_ameliorer:
-        parsed.points_a_ameliorer || parsed.negatives || [],
+      points_positifs: Array.isArray(parsed.points_positifs) ? parsed.points_positifs : [],
+      points_a_ameliorer: Array.isArray(parsed.points_a_ameliorer) ? parsed.points_a_ameliorer : [],
       suggestion:
-        parsed.suggestion ||
-        "Veuillez préciser davantage certains éléments du plan de cours.",
+        typeof parsed.suggestion === "string" && parsed.suggestion.trim()
+          ? parsed.suggestion
+          : "Analyse terminée. (Aucune suggestion fournie.)",
     };
 
     res.json(result);
