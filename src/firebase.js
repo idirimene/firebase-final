@@ -33,7 +33,6 @@ const githubProvider = new GithubAuthProvider();
 
 export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
 
-
 export const loginWithGithub = () => signInWithPopup(auth, githubProvider);
 
 export const loginWithEmailPassword = (email, password) =>

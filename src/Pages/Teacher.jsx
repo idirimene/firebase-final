@@ -53,7 +53,24 @@ export default function Teacher() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-  //handle analyze
+  //hhh
+  const handleAnalyze = async () => {
+    if (!text.trim()) return;
+
+    setLoading(true);
+    setResult("");
+
+    try {
+      const res = await analyzeResponse("Analyse grammaticale", text, RULE_TEXT);
+      const pretty = toPrettyText(res);
+      setResult(pretty);
+    } catch (err) {
+      console.error(err);
+      setResult(`Erreur IA:\n${err?.message || String(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="teacher-wrapper">
