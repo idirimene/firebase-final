@@ -1,151 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerWithEmailPassword, db } from "../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 
-const THEME = {
-  bg1: "#071A2B",
-  bg2: "#0D2B4B",
-  card: "rgba(7, 22, 38, 0.92)",
-  border: "#1B3D5C",
-  text: "#EAF2FA",
-  muted: "#B7C8D8",
-  accent1: "#1E6FB8",
-  accent2: "#124A7A",
-  danger: "#FF6B6B",
-};
-
 export default function Signup() {
   const navigate = useNavigate();
-  const { user, loginGoogle, loginGithub } = useAuth(); // ✅ AJOUT
+  const { user, loginGoogle, loginGithub } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const styles = useMemo(
-    () => ({
-      wrapper: {
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        background: `linear-gradient(to bottom, ${THEME.bg1}, ${THEME.bg2})`,
-        color: THEME.text,
-        fontFamily: "sans-serif",
-      },
-      header: {
-        height: 56,
-        display: "flex",
-        alignItems: "center",
-        padding: "0 24px",
-        fontWeight: 800,
-        fontSize: 18,
-        letterSpacing: 0.2,
-      },
-      centerZone: {
-        flex: 1,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 16,
-      },
-      card: {
-        width: "100%",
-        maxWidth: 480,
-        background: THEME.card,
-        border: `1px solid ${THEME.border}`,
-        borderRadius: 18,
-        padding: "32px 36px 28px",
-        boxShadow: "0 22px 55px rgba(0,0,0,0.45)",
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        backdropFilter: "blur(6px)",
-      },
-      title: {
-        textAlign: "center",
-        fontSize: 28,
-        fontWeight: 900,
-        margin: "0 0 16px",
-      },
-      error: {
-        backgroundColor: "rgba(255, 107, 107, 0.12)",
-        border: `1px solid ${THEME.danger}`,
-        color: THEME.danger,
-        padding: 10,
-        borderRadius: 10,
-        marginBottom: 14,
-        fontSize: 13,
-        textAlign: "center",
-        whiteSpace: "pre-wrap",
-      },
-      label: { display: "block", fontSize: 14, marginBottom: 6, fontWeight: 700 },
-      input: {
-        width: "100%",
-        borderRadius: 10,
-        border: `1px solid ${THEME.border}`,
-        backgroundColor: "rgba(255,255,255,0.06)",
-        padding: "12px 14px",
-        fontSize: 14,
-        color: THEME.text,
-        marginBottom: 16,
-        outline: "none",
-        boxSizing: "border-box",
-      },
-      primaryBtn: {
-        width: "100%",
-        borderRadius: 999,
-        border: `1px solid ${THEME.border}`,
-        padding: "12px 16px",
-        fontSize: 14,
-        fontWeight: 900,
-        background: `linear-gradient(to right, ${THEME.accent1}, ${THEME.accent2})`,
-        color: THEME.text,
-        cursor: "pointer",
-        marginTop: 8,
-      },
-      socialBtn: {
-        width: "100%",
-        borderRadius: 999,
-        border: `1px solid ${THEME.border}`,
-        marginTop: 12,
-        padding: "12px 16px",
-        fontSize: 14,
-        fontWeight: 900,
-        cursor: "pointer",
-        backgroundColor: "rgba(255,255,255,0.06)",
-        color: THEME.text,
-        boxSizing: "border-box",
-      },
-      divider: {
-        display: "flex",
-        alignItems: "center",
-        margin: "18px 0 10px 0",
-        color: THEME.muted,
-        fontSize: 12,
-        width: "100%",
-      },
-      line: { flex: 1, height: 1, backgroundColor: THEME.border },
-      linkBtn: {
-        width: "100%",
-        borderRadius: 999,
-        border: `1px solid ${THEME.border}`,
-        padding: "12px 16px",
-        fontSize: 14,
-        fontWeight: 900,
-        cursor: "pointer",
-        backgroundColor: "rgba(255,255,255,0.06)",
-        color: THEME.text,
-        marginTop: 14,
-      },
-      footer: { marginTop: 16, textAlign: "center", fontSize: 12, color: THEME.muted },
-    }),
-    []
-  );
 
   useEffect(() => {
     if (user) navigate("/teacher", { replace: true });
@@ -185,12 +52,9 @@ export default function Signup() {
     try {
       const userCredential = await registerWithEmailPassword(email, password);
       const newUser = userCredential.user;
-
       await ensureUserDoc(newUser);
-
       navigate("/teacher");
     } catch (err) {
-      console.error(err);
       if (err.code === "auth/email-already-in-use") {
         setError("Cet email est déjà utilisé.");
       } else if (err.code === "auth/weak-password") {
@@ -207,11 +71,10 @@ export default function Signup() {
     setError("");
     setLoading(true);
     try {
-      const cred = await loginGoogle(); // popup
+      const cred = await loginGoogle();
       await ensureUserDoc(cred?.user);
       navigate("/teacher");
     } catch (err) {
-      console.error(err);
       setError("Erreur d'inscription Google.");
     } finally {
       setLoading(false);
@@ -222,11 +85,10 @@ export default function Signup() {
     setError("");
     setLoading(true);
     try {
-      const cred = await loginGithub(); // popup
+      const cred = await loginGithub();
       await ensureUserDoc(cred?.user);
       navigate("/teacher");
     } catch (err) {
-      console.error(err);
       setError("Erreur d'inscription GitHub.");
     } finally {
       setLoading(false);
@@ -234,71 +96,73 @@ export default function Signup() {
   };
 
   return (
-    <div style={styles.wrapper}>
-      <header style={styles.header}>PlanValidator</header>
+    <div className="auth-wrapper">
+      <header className="auth-header">
+        <div className="auth-logo">CorrectorAI</div>
+      </header>
 
-      <div style={styles.centerZone}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>Créer un compte</h1>
+      <div className="auth-center">
+        <div className="auth-card">
+          <h1 className="auth-title">Créer un compte</h1>
 
-          {error && <div style={styles.error}>{error}</div>}
+          {error && <div className="auth-error">{error}</div>}
 
-          <label style={styles.label}>Courriel</label>
+          <label className="auth-label">Adresse courriel</label>
           <input
-            style={styles.input}
-            placeholder="votre@courriel.com"
+            className="auth-input"
+            placeholder="ton@email.com"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
 
-          <label style={styles.label}>Mot de passe</label>
+          <label className="auth-label">Mot de passe</label>
           <input
-            style={styles.input}
-            placeholder="Mot de passe"
+            className="auth-input"
+            placeholder="••••••••"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          <label style={styles.label}>Confirmer</label>
+          <label className="auth-label">Confirmer le mot de passe</label>
           <input
-            style={styles.input}
-            placeholder="Confirmer le mot de passe"
+            className="auth-input"
+            placeholder="••••••••"
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
 
           <button
-            style={{ ...styles.primaryBtn, opacity: loading ? 0.75 : 1 }}
+            className="btn-primary"
             onClick={handleSignup}
             disabled={loading}
+            style={{ opacity: loading ? 0.6 : 1 }}
           >
-            {loading ? "Création..." : "S'inscrire"}
+            {loading ? "Création en cours..." : "S'inscrire"}
           </button>
 
-          {/* ✅ Google + GitHub */}
-          <div style={styles.divider}>
-            <div style={styles.line} />
-            <span style={{ padding: "0 10px" }}>ou</span>
-            <div style={styles.line} />
+          <div className="auth-divider">
+            <div className="auth-divider-line" />
+            <span>ou</span>
+            <div className="auth-divider-line" />
           </div>
 
-          <button style={styles.socialBtn} onClick={handleGoogleSignup} disabled={loading}>
+          <button className="btn-social" onClick={handleGoogleSignup} disabled={loading}>
             Continuer avec Google
           </button>
 
-          <button style={styles.socialBtn} onClick={handleGithubSignup} disabled={loading}>
+          <button className="btn-social" onClick={handleGithubSignup} disabled={loading}>
             Continuer avec GitHub
           </button>
 
-          <button style={styles.linkBtn} onClick={() => navigate("/login")}>
-            Retour à la connexion
+          <button className="btn-secondary" onClick={() => navigate("/login")}>
+            Déjà un compte? Se connecter
           </button>
 
-          <div style={styles.footer}>
-            Ton compte est créé avec le rôle <strong>teacher</strong>.
+          <div className="auth-footer">
+            Ton compte est sécurisé avec Firebase Auth
           </div>
         </div>
       </div>

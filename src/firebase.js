@@ -12,13 +12,12 @@ import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "examenappweb2.firebaseapp.com",
-  projectId: "examenappweb2",
-  storageBucket: "examenappweb2.firebasestorage.app",
-  messagingSenderId: "1051493944203",
-  appId: "1:1051493944203:web:42524b66b0ef94964afd8e",
-  measurementId: "G-LB3B1HX0C9",
+  apiKey: "AIzaSyCkUHJu5E6XRYjWgSGCmgaEzQJwFSrxIzE",
+  authDomain: "corrector-ai-d8339.firebaseapp.com",
+  projectId: "corrector-ai-d8339",
+  storageBucket: "corrector-ai-d8339.firebasestorage.app",
+  messagingSenderId: "953107677366",
+  appId: "1:953107677366:web:165939cdfa0debda692617"
 };
 
 const app = initializeApp(firebaseConfig);

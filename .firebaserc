@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "examenappweb2"
-  }
+    "default": "examenappweb2",
+    "production": "corrector-ai-d8339"
+  },
+  "targets": {},
+  "etags": {}
 }
