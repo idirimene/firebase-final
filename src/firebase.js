@@ -3,7 +3,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   GithubAuthProvider,
-  signInWithPopup,
+  signInWithPopup,  
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from "firebase/auth";
