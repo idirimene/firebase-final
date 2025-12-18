@@ -36,39 +36,7 @@ export default function Login() {
     }
   };
 
-  const handleEmailLogin = async () => {
-    setError("");
-
-    if (!captchaToken) {
-      setError("Veuillez confirmer que vous n'êtes pas un robot.");
-      return;
-    }
-
-    try {
-      const url =
-        import.meta.env.VITE_RECAPTCHA_VERIFY_URL ||
-        "https://us-central1-examenappweb2.cloudfunctions.net/verifyRecaptcha";
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: captchaToken }),
-      });
-
-      const data = await res.json();
-
-      if (!data?.success) {
-        setError("reCAPTCHA invalide. Réessaie.");
-        return;
-      }
-
-      await loginEmailPwd(email, password);
-      setCaptchaToken(null);
-    } catch (err) {
-      console.error(err);
-      setError("Échec de connexion. Vérifiez vos identifiants.");
-    }
-  };
+  //recapchta
 
   return (
     <div className="auth-wrapper">
