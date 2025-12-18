@@ -4,7 +4,7 @@ const { setGlobalOptions } = require("firebase-functions/v2");
 const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 
-// ✅ Admin SDK pour vérifier App Check
+
 const admin = require("firebase-admin");
 admin.initializeApp();
 
@@ -15,9 +15,7 @@ setGlobalOptions({
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-/**
- * ✅ CORS helper (répond au preflight OPTIONS)
- */
+
 function applyCors(req, res, extraHeaders = "") {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
